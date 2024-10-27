@@ -1,4 +1,5 @@
 #include "esp_log.h"
+#include "nvs_flash.h"
 
 void chip_init(){
     esp_err_t ret = nvs_flash_init();
@@ -7,6 +8,4 @@ void chip_init(){
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
 }
