@@ -1,0 +1,1 @@
+void chip_init();

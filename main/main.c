@@ -7,22 +7,9 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "csp_if_lora.h"
-#include "lora.h"
+#include "wifi.h"
+#include "chip_init.h"
 
-void csp_print_func(const char * fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    esp_log_writev(ESP_LOG_INFO,"csp", fmt, args);
-    va_end(args);
-}
-
-void csp_reboot_hook(void) {
-    esp_restart();
-}
-
-void csp_shutdown_hook(void) {
-    esp_restart();
-}
 
 void router_task(void * param) {
 	while(1) {
@@ -32,6 +19,13 @@ void router_task(void * param) {
 
 
 void app_main(){
+    chip_init();
+    wifi_init_sta();
+    while(1){
+        ESP_LOGI("main","LOOP");
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
+    }
+
 	csp_conf.version = 2;
 	csp_conf.hostname = "ESP32-1";
 	csp_conf.model = "1";
@@ -56,5 +50,6 @@ void app_main(){
         ESP_LOGI("ping","Ping reply: %d",rep);
         vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
+
 }
 
