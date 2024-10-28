@@ -1,0 +1,68 @@
+menu "libparam"
+
+	config SLASH
+		bool "Build slash"
+		default false
+		help
+			Build slash
+
+	config COLLECTOR
+		bool "Build collector"
+		default false
+		help
+			Build collector
+
+	config VMEM_FRAM
+		bool "Build vmem fram"
+		default false
+		help
+			Build vmem fram
+
+	config HAVE_FOPEN
+		bool "Have posix fopen available"
+		default false
+		help
+			Have posix fopen available
+
+	config LIST_DYNAMIC
+		bool "Enable dynamic parameter lists"
+		default false
+		help
+			Compile support for dynamic param list (requres sys/queue.h) and dynamic memory allocation
+
+	config LIST_POOL
+		int "support  nr. pre-allocated param list (requieres sys/queue.h)"
+		default 0
+		help
+			support pre-allocated param list (requieres sys/queue.h)
+
+	config SCHEDULER
+		bool "enable Scheduler server"
+		default false
+		help
+			Enable scheduler server
+
+	config COMMANDS
+		bool "build command server"
+		default false
+		help
+			Enable command server
+
+	config SCHEDULER_CLIENT
+		bool "build scheduler_client"
+		default false
+		help
+			Enable scheduler_client
+
+	config COMMANDS_CLIENT
+		bool "build commands_client"
+		default false
+		help
+			Enable commands_client
+
+	config HAVE_FLOAT
+		bool "build with floats"
+		default true
+		help
+			Enable floats
+endmenu
