@@ -1,5 +1,3 @@
-
-
 #include <csp/csp_crc32.h>
 
 #include <endian.h>
@@ -104,7 +102,7 @@ int csp_crc32_verify(csp_packet_t * packet) {
 		if (memcmp(&packet->data[packet->length] - sizeof(crc), &crc, sizeof(crc)) != 0) {
 			return CSP_ERR_CRC32;
 		}
-		
+
 	}
 
 	/* Strip CRC32 */

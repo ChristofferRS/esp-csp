@@ -213,7 +213,7 @@ static int csp_cmp_handler(csp_packet_t * packet) {
 }
 
 void csp_service_handler(csp_packet_t * packet) {
-	csp_hex_dump("incoming packet", packet->data, packet->length);
+	//csp_hex_dump("incoming packet", packet->data, packet->length);
 	switch (packet->id.dport) {
 
 		case CSP_CMP:

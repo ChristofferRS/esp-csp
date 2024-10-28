@@ -9,10 +9,9 @@
 
 #define MSG_CONFIRM (0)
 
-static int csp_if_udp_tx(csp_iface_t * iface, uint16_t via, csp_packet_t * packet, int from_me) {
+static int csp_if_udp_tx(csp_iface_t * iface, uint16_t via, csp_packet_t * packet) {
 
 	csp_if_udp_conf_t * ifconf = iface->driver_data;
-
 	if (ifconf->sockfd == 0) {
 		csp_print("Sockfd null\n");
 		csp_buffer_free(packet);
@@ -61,10 +60,9 @@ void * csp_if_udp_rx_loop(void * param) {
 
 	csp_iface_t * iface = param;
 	csp_if_udp_conf_t * ifconf = iface->driver_data;
-
 	while (ifconf->sockfd == 0) {
 
-		ifconf->sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+		ifconf->sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
 		struct sockaddr_in server_addr = {0};
 		server_addr.sin_family = AF_INET;
@@ -87,7 +85,7 @@ void * csp_if_udp_rx_loop(void * param) {
 		if (ret == CSP_ERR_INVAL) {
 			iface->rx_error++;
 		} else if (ret == CSP_ERR_NOMEM) {
-            vTaskDelay(10000);
+            vTaskDelay(1);
 		}
 	}
 
@@ -108,7 +106,7 @@ void csp_if_udp_init(csp_iface_t * iface, csp_if_udp_conf_t * ifconf) {
 
 	static StackType_t udp_rx_stack[10000] __attribute__((section(".noinit")));
 	static StaticTask_t udp_rx_tcb  __attribute__((section(".noinit")));
-	xTaskCreateStatic(csp_if_udp_rx_loop, "LoRaRX", 10000, &iface, 3, udp_rx_stack, &udp_rx_tcb);
+	xTaskCreateStatic(csp_if_udp_rx_loop, "UDPRX", 10000, iface, 3, udp_rx_stack, &udp_rx_tcb);
 
 	/* Regsiter interface */
 	iface->name = "UDP",

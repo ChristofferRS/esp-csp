@@ -10,6 +10,7 @@
 #include <csp/arch/csp_time.h>
 #include <sys/types.h>
 
+#include <libparam.h>
 #include <param/param.h>
 #include <param/param_queue.h>
 #include <param/param_server.h>
@@ -112,7 +113,7 @@ static void param_serve_pull_request(csp_packet_t * request, int all, int versio
 						mpack_discard(&_reader);
 
 						if(_param == param){
-							found = 1;	
+							found = 1;
 							break;
 						}
 					}
@@ -128,7 +129,7 @@ static void param_serve_pull_request(csp_packet_t * request, int all, int versio
 
 					/* Set offset to -1 to ack with all array values */
 					offset = -1;
-				} 
+				}
 				if (__add(&ctx, param, offset) < 0) {
 					csp_buffer_free(request);
 					return;
@@ -155,7 +156,7 @@ static void param_serve_pull_request(csp_packet_t * request, int all, int versio
 			/* In any one of the exclude matches, continue */
 			if ((param->mask & exclude_mask) != 0)
 				continue;
-			
+
 			if (__add(&ctx, param, -1) < 0) {
 				csp_buffer_free(request);
 				return;
@@ -205,6 +206,7 @@ static void param_serve_push(csp_packet_t * packet, int send_ack, int version, i
 
 
 void param_serve(csp_packet_t * packet) {
+    csp_print("HANDLE PARAM REQ!!!");
 	switch(packet->data[0]) {
 		case PARAM_PULL_REQUEST:
 			param_serve_pull_request(packet, 0, 1);
@@ -299,7 +301,7 @@ void param_serve(csp_packet_t * packet) {
 		case PARAM_COMMAND_ADD_REQUEST:
 			param_serve_command_add(packet);
 			break;
-			
+
 		case PARAM_COMMAND_SHOW_REQUEST:
 			param_serve_command_show(packet);
 			break;
@@ -315,7 +317,7 @@ void param_serve(csp_packet_t * packet) {
 		case PARAM_COMMAND_RM_ALL_REQUEST:
 			param_serve_command_rm_all(packet);
 			break;
-		
+
 #endif
 
 		default:

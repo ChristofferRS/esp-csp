@@ -1022,5 +1022,23 @@ void csp_rdp_get_opt(unsigned int * window_size, unsigned int * conn_timeout_ms,
 		*ack_delay_count = csp_rdp_ack_delay_count;
 }
 
+bool csp_rdp_conn_is_active(csp_conn_t *conn) {
+
+	uint32_t time_now = csp_get_ms();
+	bool active = true;
+
+	if (csp_rdp_time_after(time_now, conn->timestamp + conn->rdp.conn_timeout)) {
+		/* The RDP connection has timed out */
+		csp_rdp_error("RDP %p: Timeout no packets received last %u ms\n", (void *)conn, conn->rdp.conn_timeout);
+		active = false;
+	}
+
+	if (conn->rdp.state == RDP_CLOSE_WAIT || conn->rdp.state == RDP_CLOSED) {
+		active = false;
+	}
+
+	return active;
+
+}
 
 #endif  // CSP_USE_RDP

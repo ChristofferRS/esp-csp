@@ -39,7 +39,7 @@ int csp_ping(uint16_t node, uint32_t timeout, unsigned int size, uint8_t conn_op
 	if (packet == NULL)
 		goto out;
 
-	csp_hex_dump("incoming packet", packet->data, packet->length);
+	//csp_hex_dump("incoming packet", packet->data, packet->length);
 	/* Ensure that the data was actually echoed */
 	for (i = 0; i < size; i++) {
 		if (packet->data[i] != i % (0xff + 1)) {

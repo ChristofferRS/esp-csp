@@ -195,7 +195,7 @@ void param_list_remove_specific(param_t * param, uint8_t verbose, int destroy) {
 #endif
 
 param_t * param_list_find_id(int node, int id) {
-	
+
 	if (node < 0)
 		node = 0;
 
@@ -220,7 +220,7 @@ param_t * param_list_find_id(int node, int id) {
 }
 
 param_t * param_list_find_name(int node, const char * name) {
-	
+
 	if (node < 0 )
 		node = 0;
 
@@ -258,7 +258,7 @@ void param_list_print(uint32_t mask, int node, const char * globstr, int verbosi
 		}
 
 		param_print(param, -1, NULL, 0, verbosity, 0);
-		
+
 	}
 }
 
@@ -286,7 +286,7 @@ int param_list_pack(void* buf, int buf_size, int prio_only, int remote_only, int
 			continue;
 
 		if (list_version == 1) {
-			
+
 			// Not supported
 
 		} else if (list_version == 2) {
@@ -298,7 +298,7 @@ int param_list_pack(void* buf, int buf_size, int prio_only, int remote_only, int
 			rparam->type = param->type;
 			rparam->size = param->array_size;
 			rparam->mask = htobe32(param->mask);
-			
+
 			strlcpy(rparam->name, param->name, sizeof(rparam->name));
 
 			/* Ensure strings are null terminated */
@@ -313,7 +313,7 @@ int param_list_pack(void* buf, int buf_size, int prio_only, int remote_only, int
 			rparam->type = param->type;
 			rparam->size = param->array_size;
 			rparam->mask = htobe32(param->mask);
-			
+
 			strlcpy(rparam->name, param->name, sizeof(rparam->name));
 
 			if (param->vmem) {
@@ -334,7 +334,7 @@ int param_list_pack(void* buf, int buf_size, int prio_only, int remote_only, int
 			rparam->help[sizeof(rparam->help)-1] = '\0';
 
 		}
-		
+
 		param_packed += param_list_packed_size(list_version);
 		num_params++;
 
@@ -345,7 +345,7 @@ int param_list_pack(void* buf, int buf_size, int prio_only, int remote_only, int
 	}
 
 	return num_params;
-	
+
 }
 
 #if defined PARAM_LIST_DYNAMIC && PARAM_LIST_POOL > 0
@@ -592,7 +592,7 @@ param_t * param_list_create_remote(int id, int node, int type, uint32_t mask, in
 	if (param_heap == NULL) {
 		return NULL;
 	}
-	
+
 	param_t * param = &param_heap->param;
 	if (param == NULL) {
 		return NULL;
@@ -624,7 +624,7 @@ param_t * param_list_create_remote(int id, int node, int type, uint32_t mask, in
 	param->vmem->big_endian = false;
 	param->vmem->restore = NULL;
 	param->vmem->write = NULL;
-	
+
 	strlcpy(param->name, name, 36);
 	if (unit) {
 		strlcpy(param->unit, unit, 10);
@@ -705,10 +705,10 @@ void list_add_output(unsigned int mask, FILE * out){
 	switch(mask & PM_PRIO_MASK) {
 		case PM_PRIO1: fprintf(out, "1"); mask &= ~ PM_PRIO_MASK; break;
 		case PM_PRIO2: fprintf(out, "2"); mask &= ~ PM_PRIO_MASK; break;
-		case PM_PRIO3: fprintf(out, "3"); mask &= ~ PM_PRIO_MASK; break;				
+		case PM_PRIO3: fprintf(out, "3"); mask &= ~ PM_PRIO_MASK; break;
 	}
 
-	
+
 	//if (mask)
 	//	fprintf(out, "+%x", mask);
 

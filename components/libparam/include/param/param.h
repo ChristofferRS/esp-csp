@@ -9,6 +9,7 @@
 #define SRC_PARAM_PARAM_H_
 
 #include <stdint.h>
+#include <libparam.h>
 #include <vmem/vmem.h>
 
 #ifdef __cplusplus

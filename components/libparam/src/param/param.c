@@ -65,9 +65,9 @@ void param_get(param_t * param, unsigned int offset, void * value) {
 		param_get_data(param, value, param->array_size);
 		break;
     case PARAM_TYPE_INVALID:
-        break;     
+        break;
 	}
-    
+
 }
 
 void param_get_data(param_t * param, void * outbuf, int len)

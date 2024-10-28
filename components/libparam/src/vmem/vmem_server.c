@@ -42,7 +42,7 @@ void vmem_server_handler(csp_conn_t * conn)
 
 		uint64_t length;
 		uint64_t address;
-		
+
 		if (request->version == 3) {
 			address = be64toh(request->data3.address);
 			length = be64toh(request->data3.length);
@@ -81,29 +81,13 @@ void vmem_server_handler(csp_conn_t * conn)
 
 				csp_send(conn, packet);
 			}
-		} else if (type == VMEM_SERVER_CALCULATE_CRC32) {
-
-			/* Do the CRC32 calculation on the address area (vmem) using the request packet as the buffer */
-			uint32_t crc = vmem_calc_crc32(address, length, &packet->data[0], VMEM_SERVER_MTU);
-
-			/* Convert to network byte order */
-			crc = htobe32(crc);
-
-			/* Copy checksum to packet */
-			memcpy(&packet->data[0], &crc, sizeof(crc));
-			packet->length = sizeof(crc);
-
-			/* Send the response */
-			csp_send(conn, packet);
-		}
-
-	/**
+		} 	/**
 	 * UPLOAD
 	 */
 	} else if (request->type == VMEM_SERVER_UPLOAD) {
 
 		uint64_t address;
-		
+
 		if (request->version == 2) {
 			address = be64toh(request->data2.address);
 		} else {
@@ -148,7 +132,7 @@ void vmem_server_handler(csp_conn_t * conn)
 			csp_send(conn, packet);
 
 		} else if (request->version == 2) {
-			
+
 			vmem_list2_t * list = (vmem_list2_t *) packet->data;
 
 			int i = 0;
@@ -295,7 +279,7 @@ static void rparam_list_handler(csp_conn_t * conn)
 		rparam->type = param->type;
 		rparam->size = param->array_size;
 		rparam->mask = htobe32(param->mask);
-		
+
 		strncpy(rparam->name, param->name, 35);
 
 		if (param->vmem) {
@@ -312,7 +296,7 @@ static void rparam_list_handler(csp_conn_t * conn)
 		}
 		//packet->length = sizeof(param_transfer3_t);
 		packet->length = offsetof(param_transfer3_t, help) + helplen + 1;
-		
+
 		csp_send(conn, packet);
 	}
 }

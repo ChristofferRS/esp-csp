@@ -242,6 +242,7 @@ int csp_conn_src(csp_conn_t *conn);
 */
 int csp_conn_flags(csp_conn_t *conn);
 
+bool csp_conn_is_active(csp_conn_t *conn);
 /**
    Set socket to listen for incoming connections.
    @param[in] socket socket
