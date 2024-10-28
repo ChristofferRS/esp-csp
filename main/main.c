@@ -6,9 +6,16 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
-#include "csp_if_lora.h"
-#include "wifi.h"
+#include "lora/csp_if_lora.h"
+#include "wifi/wifi.h"
 #include "chip_init.h"
+#include "param/param.h"
+#include "param/param_server.h"
+#include "udp/csp_if_udp.h"
+
+
+
+PARAM_DEFINE_STATIC_RAM(22, test_param, PARAM_TYPE_UINT8, -1, 0, PM_CONF, NULL, NULL, 0x00, "Test Parameter");
 
 
 void router_task(void * param) {
@@ -34,11 +41,20 @@ void app_main(){
 	csp_conf.dedup = CSP_DEDUP_OFF;
 
     csp_init();
+
+    csp_iface_t udp_iface;
+    csp_if_udp_conf_t udp_conf;
+    udp_conf.host = "192.168.1.1";
+    udp_conf.lport = 52001;
+    udp_conf.rport = 52002;
+    csp_if_udp_init(&udp_iface, &udp_conf);
+
     csp_lora_init(3);
     csp_print("Interfaces\r\n");
     csp_iflist_print();
 
 	csp_bind_callback(csp_service_handler, CSP_ANY);
+	csp_bind_callback(param_serve, PARAM_PORT_SERVER);
     //csp_sendto(uint8_t prio, uint16_t dest, uint8_t dport, uint8_t src_port, uint32_t opts, csp_packet_t * packet) {
 
 	static StackType_t router_stack[5000] __attribute__((section(".noinit")));
@@ -46,8 +62,8 @@ void app_main(){
 	xTaskCreateStatic(router_task, "RTE", 5000, NULL, 2, router_stack, &router_tcb);
 
     while(1){
-        int rep = csp_ping(10, 2000, 10, CSP_O_NONE);
-        ESP_LOGI("ping","Ping reply: %d",rep);
+        //int rep = csp_ping(10, 2000, 10, CSP_O_NONE);
+        //ESP_LOGI("ping","Ping reply: %d",rep);
         vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
 

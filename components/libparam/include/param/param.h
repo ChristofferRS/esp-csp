@@ -11,8 +11,6 @@
 #include <stdint.h>
 #include <vmem/vmem.h>
 
-#include "libparam.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
