@@ -3,6 +3,7 @@ idf_component_register(SRCS
                         "lora/csp_if_lora.c" "lora/lora.c"
                         "wifi/wifi.c"
                         "udp/csp_if_udp.c"
+                        "vmem/vmem_flash.c"
                        INCLUDE_DIRS "."
                        PRIV_REQUIRES driver libcsp esp_wifi nvs_flash libparam
 )

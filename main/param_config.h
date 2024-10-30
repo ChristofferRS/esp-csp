@@ -1,0 +1,3 @@
+
+
+#define PARAMID_BOOTCNT 1
