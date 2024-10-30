@@ -4,7 +4,6 @@
 #include <csp/csp_debug.h>
 #include <stddef.h>
 
-#if (CSP_ENABLE_CSP_PRINT)
 void csp_hex_dump_format(const char * desc, void * addr, int len, int format) {
 	int i;
 	unsigned char buff[17];
@@ -28,7 +27,7 @@ void csp_hex_dump_format(const char * desc, void * addr, int len, int format) {
 
 			// Output the offset.
 			if (format & 0x1) {
-				csp_print("  %p ", ((uint8_t *)addr) + i);
+				csp_print("  %p ", (void *)(((uint8_t *)addr) + i));
 			} else {
 				csp_print("        ");
 			}
@@ -58,6 +57,3 @@ void csp_hex_dump_format(const char * desc, void * addr, int len, int format) {
 void csp_hex_dump(const char * desc, void * addr, int len) {
 	csp_hex_dump_format(desc, addr, len, 0);
 }
-#else
-void csp_hex_dump(const char * desc, void * addr, int len) {};
-#endif

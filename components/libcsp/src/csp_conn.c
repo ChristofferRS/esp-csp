@@ -1,6 +1,4 @@
-
-
-#include <csp/csp_autoconfig.h>
+#include "csp/autoconfig.h"
 
 #include "csp_conn.h"
 
@@ -11,6 +9,7 @@
 #include <csp/arch/csp_time.h>
 #include <csp/csp_id.h>
 #include <csp/csp_debug.h>
+#include "csp_macro.h"
 #include "csp_rdp_queue.h"
 #include "csp_rdp.h"
 
@@ -20,7 +19,7 @@
 #endif
 
 /* Connection pool */
-static csp_conn_t arr_conn[CSP_CONN_MAX] __attribute__((section(".noinit")));
+static csp_conn_t arr_conn[CSP_CONN_MAX] __noinit;
 
 void csp_conn_check_timeouts(void) {
 #if (CSP_USE_RDP)
@@ -92,6 +91,10 @@ csp_conn_t * csp_conn_find_existing(csp_id_t * id) {
 	for (int i = 0; i < CSP_CONN_MAX; i++) {
 		csp_conn_t * conn = &arr_conn[i];
 
+		/* Connection must be open */
+		if (conn->state != CONN_OPEN)
+			continue;
+
 		/**
 		 * This search looks verbose, Instead of a big if statement, it is written out as
 		 * conditions. This has been done for clarity. The least likely check is put first
@@ -100,26 +103,37 @@ csp_conn_t * csp_conn_find_existing(csp_id_t * id) {
 		 * portability and dual use between different header formats.
 		 */
 
-		/* Connection must match dport */
-		if (conn->idin.dport != id->dport)
-			continue;
+		/* Outgoing connections are uniquely defined by the source port,
+		 * So only the incoming destination port must match. This means
+		 * that responses to broadcast addresses, are accepted as long
+		 * as the incoming port matches the unique source port of the 
+		 * connection */
+		if (conn->type == CONN_CLIENT) {
 
-		/* Connection must match sport */
-		if (conn->idin.sport != id->sport)
-			continue;
+			/* Connection must match dport */
+			if (conn->idin.dport != id->dport)
+				continue;
 
-		/* Connection must match destination */
-		if (conn->idin.dst != id->dst)
-			continue;
+		/* Incoming connections are uniquely defined by the source amd
+		 * destination port, as well as the source node. Incoming
+		 * connections can never come from a brodcast address */
+		} else {
+      
+			/* Connection must match dport */
+			if (conn->idin.dport != id->dport)
+				continue;
 
+			/* Connection must match sport */
+			if (conn->idin.sport != id->sport)
+				continue;
 
-		/* Connection must be open */
-		if (conn->state != CONN_OPEN)
-			continue;
+			/* Connection must match source */
+			if (conn->idin.src != id->src)
+				continue;
 
-		/* Connection must be client */
-		if (conn->type != CONN_CLIENT)
-			continue;
+		}
+
+		
 
 		/* All conditions found! */
 		return conn;
@@ -153,7 +167,7 @@ csp_conn_t * csp_conn_allocate(csp_conn_type_t type) {
 		i = (i + 1) % CSP_CONN_MAX;
 
 		int expected = CONN_CLOSED;
-		if (atomic_compare_exchange_weak(&arr_conn[i].state, &expected, CONN_OPEN)) {
+		if (atomic_compare_exchange_strong(&arr_conn[i].state, &expected, CONN_OPEN)) {
 			conn = &arr_conn[i];
 			csp_conn_last_given = i;
 			break;
@@ -172,10 +186,10 @@ csp_conn_t * csp_conn_allocate(csp_conn_type_t type) {
 	return conn;
 }
 
-csp_conn_t * csp_conn_new(csp_id_t idin, csp_id_t idout) {
+csp_conn_t * csp_conn_new(csp_id_t idin, csp_id_t idout, csp_conn_type_t type) {
 
 	/* Allocate connection structure */
-	csp_conn_t * conn = csp_conn_allocate(CONN_CLIENT);
+	csp_conn_t * conn = csp_conn_allocate(type);
 
 	if (conn) {
 		/* No lock is needed here, because nobody else *
@@ -228,7 +242,7 @@ int csp_conn_close(csp_conn_t * conn, uint8_t closed_by) {
 
 	/* Set to closed */
 	conn->state = CONN_CLOSED;
-
+	
 	return CSP_ERR_NONE;
 }
 
@@ -236,34 +250,25 @@ csp_conn_t * csp_connect(uint8_t prio, uint16_t dest, uint8_t dport, uint32_t ti
 
 	/* Force options on all connections */
 	opts |= csp_conf.conn_dfl_so;
-
-	int source_addr = -1;
-	csp_iface_t * local_interface = csp_iflist_get_by_subnet(dest);
-	if (local_interface) {
-		source_addr = local_interface->addr;
-	} else {
-		csp_route_t * route = csp_rtable_find_route(dest);
-		if (route) {
-			source_addr = route->iface->addr;
-		}
-	}
-
-	if (source_addr == -1) {
-		csp_dbg_conn_noroute++;
-		return NULL;
-	}
-
+	
 	/* Generate identifier */
 	csp_id_t incoming_id, outgoing_id;
+
+	/* Use 0 as incoming id (this disables the input filter on destination node)
+	 * This means that for this outgoing connection, we accept the answer coming to whatever address
+	 * the outgoing interface has. CSP does not support "source address" on outgoing connections 
+	 * so the outgoing source address will be automatically applied after outgoing routing 
+	 * selects which interface the packet will leavve from */
+	incoming_id.dst = 0; 
+	outgoing_id.src = 0; 
+
 	incoming_id.pri = prio;
-	incoming_id.dst = source_addr;
-	incoming_id.src = dest;
-	incoming_id.sport = dport;
-	incoming_id.flags = 0;
 	outgoing_id.pri = prio;
+	incoming_id.src = dest;
 	outgoing_id.dst = dest;
-	outgoing_id.src = source_addr;
+	incoming_id.sport = dport;
 	outgoing_id.dport = dport;
+	incoming_id.flags = 0;
 	outgoing_id.flags = 0;
 
 	/* Set connection options */
@@ -297,7 +302,7 @@ csp_conn_t * csp_connect(uint8_t prio, uint16_t dest, uint8_t dport, uint32_t ti
 	}
 
 	/* Find a new connection */
-	csp_conn_t * conn = csp_conn_new(incoming_id, outgoing_id);
+	csp_conn_t * conn = csp_conn_new(incoming_id, outgoing_id, CONN_CLIENT);
 	if (conn == NULL) {
 		return NULL;
 	}
@@ -356,13 +361,13 @@ int csp_conn_flags(csp_conn_t * conn) {
 void csp_conn_print_table(void) {
 
 	for (unsigned int i = 0; i < CSP_CONN_MAX; i++) {
-		__attribute__((__unused__))csp_conn_t * conn = &arr_conn[i];
+		__unused csp_conn_t * conn = &arr_conn[i];
 		csp_print("[%02u %p] S:%u, %u -> %u, %u -> %u (%u) fl %x\r\n",
-		          i, conn, conn->state, conn->idin.src, conn->idin.dst,
+		          i, (void *)conn, conn->state, conn->idin.src, conn->idin.dst,
 		          conn->idin.dport, conn->idin.sport, conn->sport_outgoing, conn->idin.flags);
 #if (CSP_USE_RDP)
 		if (conn->idin.flags & CSP_FRDP) {
-			csp_print("\tRDP: S:%d (closed by 0x%x), rcv %u, snd %u, win %" PRIu32 "\n",
+			csp_print("\tRDP: S:%d (closed by 0x%x), rcv %u, snd %u, win %" PRIu32 "\n", 
 			          conn->rdp.state, conn->rdp.closed_by, conn->rdp.rcv_cur, conn->rdp.snd_una, conn->rdp.window_size);
 		}
 #endif
@@ -383,7 +388,7 @@ int csp_conn_print_table_str(char * str_buf, int str_size) {
 		csp_conn_t * conn = &arr_conn[i];
 		char buf[100];
 		snprintf(buf, sizeof(buf), "[%02u %p] S:%u, %u -> %u, %u -> %u (%u)\n",
-				 i, conn, conn->state, conn->idin.src, conn->idin.dst,
+				 i, (void *)conn, conn->state, conn->idin.src, conn->idin.dst,
 				 conn->idin.dport, conn->idin.sport, conn->sport_outgoing);
 
 		strncat(str_buf, buf, str_size);
@@ -401,6 +406,7 @@ const csp_conn_t * csp_conn_get_array(size_t * size) {
         *size = CSP_CONN_MAX;
         return arr_conn;
 }
+
 bool csp_conn_is_active(csp_conn_t *conn) {
 #if (CSP_USE_RDP)
 	if ((conn->idin.flags & CSP_FRDP) || (conn->idout.flags & CSP_FRDP)) {

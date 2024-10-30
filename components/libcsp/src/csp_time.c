@@ -3,7 +3,7 @@
 #include <csp/arch/csp_time.h>
 
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "freertos/task.h"  // FreeRTOS
 
 uint32_t csp_get_ms(void) {
 	return (uint32_t)(xTaskGetTickCount() * (1000 / configTICK_RATE_HZ));

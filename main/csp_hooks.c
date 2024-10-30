@@ -1,6 +1,7 @@
 #include "csp/csp.h"
 #include "esp_log.h"
 
+
 void csp_print_func(const char * fmt, ...) {
     va_list args;
     va_start(args, fmt);

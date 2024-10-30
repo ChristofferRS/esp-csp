@@ -12,24 +12,18 @@
 //Struct provides locking of comm with lora chip since the chip can only
 //be in oen state at the time it is not thread safe to have tx/rx going
 static struct lora_driver_s{
-    csp_iface_t iface;
+    csp_iface_t *iface;
     SemaphoreHandle_t lock;
     StaticSemaphore_t lock_buf;
 } lora_driver = {
     .lock = NULL,
-    .iface = {
-        .name = "LoRa",
-        .mtu = 256,
-        .driver_data = &lora_driver,
-    }
 };
 
 
 
-int lora_tx(csp_iface_t *iface, uint16_t via, csp_packet_t *packet){
+int lora_tx(csp_iface_t *iface, uint16_t via, csp_packet_t *packet, int from_me){
     ESP_LOGI(pcTaskGetName(NULL), "Called lora tx");
     struct lora_driver_s *driver = iface->driver_data;
-	csp_hex_dump("outgoing packet", packet->data, packet->length);
 	csp_id_prepend(packet);
     //Lock -> Transmit -> unlock
     while(xSemaphoreTake(driver->lock, 10) == pdFALSE);
@@ -49,7 +43,7 @@ int work_lora_rx(struct lora_driver_s *drv){
             return CSP_ERR_NOMEM;
         }
         int header_size = csp_id_setup_rx(packet);
-        int received_len = lora_receive_packet((uint8_t *)packet->frame_begin, csp_buffer_data_size() + header_size);
+        int received_len = lora_receive_packet((uint8_t *)packet->frame_begin, sizeof(packet->data) + header_size);
         if (received_len <= 4) {
             csp_buffer_free(packet);
             return CSP_ERR_NOMEM;
@@ -59,7 +53,7 @@ int work_lora_rx(struct lora_driver_s *drv){
             csp_buffer_free(packet);
             return CSP_ERR_INVAL;
         }
-        csp_qfifo_write(packet, &drv->iface, NULL);
+        csp_qfifo_write(packet, drv->iface, NULL);
     }
     return CSP_ERR_NONE;
 }
@@ -79,11 +73,12 @@ void lora_rx_task(void* param){
 }
 
 
-int csp_lora_init(uint8_t addr){
+int csp_lora_init(csp_iface_t *iface){
+    iface->name = "LoRa";
+    iface->nexthop = lora_tx;
+    iface->driver_data = &lora_driver;
+    lora_driver.iface = iface;
     lora_driver.lock = xSemaphoreCreateMutexStatic(&lora_driver.lock_buf);
-    lora_driver.iface.nexthop = lora_tx;
-    lora_driver.iface.addr = addr;
-    lora_driver.iface.netmask = 1;
 
     if (lora_init() == 0) {
         ESP_LOGE(pcTaskGetName(NULL), "Does not recognize the module");
@@ -112,6 +107,6 @@ int csp_lora_init(uint8_t addr){
 	static StaticTask_t lora_rx_tcb  __attribute__((section(".noinit")));
 	xTaskCreateStatic(lora_rx_task, "LoRaRX", 10000, &lora_driver, 3, lora_rx_stack, &lora_rx_tcb);
 
-	csp_iflist_add(&lora_driver.iface);
+	csp_iflist_add(lora_driver.iface);
     return CSP_ERR_NONE;
 }

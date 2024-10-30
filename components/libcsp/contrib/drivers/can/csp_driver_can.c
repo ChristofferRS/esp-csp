@@ -158,7 +158,7 @@ int csp_can_tx_frame(void *driver_data, uint32_t id, const uint8_t * data, uint8
 	 * Blocking IO:
 	 *
 	 * With CAN blocking IO is needed because we only have room for 32 frames or 256 bytes.
-	 * This is barely enough to hold a CSP packet if large MTU is used.
+	 * This is barely enough to hold a large CSP packet
 	 * We could go for async transmission with software queues, this will allow for larger amounts
 	 * of data to be queued. However in this case, simplicity is chosen over performance.
 	 * When the TX FIFO is full, we ask the task to sleep a tick.
@@ -219,16 +219,8 @@ csp_iface_t * csp_driver_can_init(int addr, int netmask, int id, can_mode_e mode
 		return NULL;
 	}
 
-	/* The MTU is configured run-time, since the buffer size can be configured externally
-	 * however, it must not exceed 2042 due to the CFP_REMAIN field limitation
-	 * CFP_REMAIN gives possibility of 255 * 8 bytes = 2040
-	 * CSP_BEGIN frame, has two additional bytes, in total 2042 */
-	mcan[id].interface.mtu = CSP_BUFFER_SIZE;
-	if (mcan[id].interface.mtu > 2042) {
-		mcan[id].interface.mtu = 2042;
-	}
-
 	mcan[id].ifdata.tx_func = csp_can_tx_frame;
+	mcan[id].ifdata.pbufs = NULL;
 	mcan[id].interface.interface_data = &mcan[id].ifdata;
 
 	mcan[id].interface.addr = addr;
@@ -273,4 +265,3 @@ csp_iface_t * csp_driver_can_init(int addr, int netmask, int id, can_mode_e mode
 	return &mcan[id].interface;
 
 }
-

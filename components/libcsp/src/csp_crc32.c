@@ -1,4 +1,7 @@
+
+
 #include <csp/csp_crc32.h>
+#include <csp/csp_id.h>
 
 #include <endian.h>
 
@@ -41,31 +44,59 @@ static const uint32_t crc_tab[256] = {
 	0xF36E6F75, 0x0105EC76, 0x12551F82, 0xE03E9C81, 0x34F4F86A, 0xC69F7B69, 0xD5CF889D, 0x27A40B9E,
 	0x79B737BA, 0x8BDCB4B9, 0x988C474D, 0x6AE7C44E, 0xBE2DA0A5, 0x4C4623A6, 0x5F16D052, 0xAD7D5351};
 
-uint32_t csp_crc32_memory(const uint8_t * data, uint32_t length) {
-	uint32_t crc;
+void csp_crc32_init(csp_crc32_t * crc) {
 
-	crc = 0xFFFFFFFF;
-	while (length--)
+	if (crc) {
+		(*crc) = 0xFFFFFFFF;
+	}
+}
+
+void csp_crc32_update(csp_crc32_t * crc, const void * data, uint32_t length) {
+
+	const uint8_t * data8 = (uint8_t*)data;
+
+	if (crc) {
+		while (length--) {
 #ifdef __AVR__
-		crc = pgm_read_dword(&crc_tab[(crc ^ *data++) & 0xFFL]) ^ (crc >> 8);
+			crc = pgm_read_dword(&crc_tab[(crc ^ *data8++) & 0xFFL]) ^ (crc >> 8);
 #else
-		crc = crc_tab[(crc ^ *data++) & 0xFFL] ^ (crc >> 8);
+			(*crc) = crc_tab[((*crc) ^ *data8++) & 0xFFL] ^ ((*crc) >> 8);
 #endif
+		}
+	}
+}
 
-	return (crc ^ 0xFFFFFFFF);
+uint32_t csp_crc32_final(csp_crc32_t *crc) {
+
+	if (crc) {
+		return ((*crc) ^ 0xFFFFFFFF);
+	}
+
+	return 0;
+}
+
+uint32_t csp_crc32_memory(const void * data, uint32_t length) {
+
+	csp_crc32_t crc;
+
+	csp_crc32_init(&crc);
+	csp_crc32_update(&crc, data, length);
+
+	return csp_crc32_final(&crc);
 }
 
 int csp_crc32_append(csp_packet_t * packet) {
 
 	uint32_t crc;
 
-	if ((packet->length + sizeof(crc)) > csp_buffer_data_size()) {
+	if ((packet->length + sizeof(crc)) > sizeof(packet->data)) {
 		return CSP_ERR_NOMEM;
 	}
 
 	/* Calculate CRC32, convert to network byte order */
 #if CSP_21 // In CSP 2.1 we change to include header per default
-		crc = csp_crc32_memory((uint8_t *)&packet->id, packet->length + sizeof(packet->id));
+		csp_id_prepend(packet);
+		crc = csp_crc32_memory(packet->frame_begin, packet->frame_length);
 #else
 		crc = csp_crc32_memory(packet->data, packet->length);
 #endif
@@ -89,7 +120,8 @@ int csp_crc32_verify(csp_packet_t * packet) {
 	}
 
 	/* Calculate CRC32, convert to network byte order */
-	crc = csp_crc32_memory((uint8_t *)&packet->id, packet->length + sizeof(packet->id) - sizeof(crc));
+	csp_id_prepend(packet);
+	crc = csp_crc32_memory(packet->frame_begin, packet->frame_length - sizeof(crc));
 	crc = htobe32(crc);
 
 	/* Compare calculated checksum with packet header */
@@ -102,7 +134,7 @@ int csp_crc32_verify(csp_packet_t * packet) {
 		if (memcmp(&packet->data[packet->length] - sizeof(crc), &crc, sizeof(crc)) != 0) {
 			return CSP_ERR_CRC32;
 		}
-
+		
 	}
 
 	/* Strip CRC32 */

@@ -2,14 +2,22 @@
 
 #pragma once
 
-#include <csp/csp_autoconfig.h>
+#include "csp/autoconfig.h"
 
 #define CSP_SEMAPHORE_OK 	0
 #define CSP_SEMAPHORE_ERROR	-1
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-typedef TaskHandle_t csp_bin_sem_t;
+#if (CSP_POSIX || __DOXYGEN__)
+    #include <semaphore.h>
+    typedef sem_t csp_bin_sem_t;
+#elif (CSP_FREERTOS)
+    #include "freertos/FreeRTOS.h"
+    #include "freertos/task.h"
+    typedef TaskHandle_t csp_bin_sem_t;
+#elif (CSP_ZEPHYR)
+    #include <zephyr/kernel.h>
+    typedef struct k_sem csp_bin_sem_t;
+#endif
 
 /**
  * initialize a binary semaphore with static storage

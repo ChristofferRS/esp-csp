@@ -1,11 +1,10 @@
-
-
 #include <csp/csp.h>
 
 #include <stdlib.h>
 
 #include <csp/csp_crc32.h>
 #include <endian.h>
+#include <csp/arch/csp_time.h>
 #include <csp/arch/csp_queue.h>
 #include <csp/crypto/csp_hmac.h>
 #include <csp/csp_id.h>
@@ -19,6 +18,7 @@
 #include "csp_rdp.h"
 #include <csp/csp_debug.h>
 #include <csp/csp_iflist.h>
+#include "csp_macro.h"
 
 /**
  * Check supported packet options
@@ -99,10 +99,11 @@ static int csp_route_security_check(uint32_t security_opts, csp_iface_t * iface,
 	return CSP_ERR_NONE;
 }
 
-__attribute__((weak)) void csp_input_hook(csp_iface_t * iface, csp_packet_t * packet) {
-	csp_print_packet("INP: S %u, D %u, Dp %u, Sp %u, Pr %u, Fl 0x%02X, Sz %" PRIu16 " VIA: %s\n",
+
+__weak void csp_input_hook(csp_iface_t * iface, csp_packet_t * packet) {
+	csp_print_packet("INP: S %u, D %u, Dp %u, Sp %u, Pr %u, Fl 0x%02X, Sz %" PRIu16 " VIA: %s, Tms %u\n",
 				   packet->id.src, packet->id.dst, packet->id.dport,
-				   packet->id.sport, packet->id.pri, packet->id.flags, packet->length, iface->name);
+				   packet->id.sport, packet->id.pri, packet->id.flags, packet->length, iface->name, csp_get_ms());
 }
 
 int csp_route_work(void) {
@@ -129,18 +130,13 @@ int csp_route_work(void) {
 
 	csp_input_hook(input.iface, packet);
 
-	/* Here there be promiscuous mode */
-#if (CSP_USE_PROMISC)
-	csp_promisc_add(packet);
-#endif
-
 	/* Count the message */
 	input.iface->rx++;
 	input.iface->rxbytes += packet->length;
 
-	/* The packet is to me, if the address matches that of the incoming interface,
+	/* The packet is to me, if the address matches that of any interface,
 	 * or the address matches the broadcast address of the incoming interface */
-	int is_to_me = ((input.iface->addr == packet->id.dst) || (csp_id_is_broadcast(packet->id.dst, input.iface->netmask)));
+	int is_to_me = (csp_iflist_get_by_addr(packet->id.dst) != NULL || (csp_id_is_broadcast(packet->id.dst, input.iface)));
 
 	/* Deduplication */
 	if ((csp_conf.dedup == CSP_DEDUP_ALL) ||
@@ -154,25 +150,18 @@ int csp_route_work(void) {
 		}
 	}
 
+	/* Here there be promiscuous mode */
+#if (CSP_USE_PROMISC)
+	csp_promisc_add(packet);
+#endif
+
 	/* If the message is not to me, route the message to the correct interface */
 	if (!is_to_me) {
 
-		/* Find the destination interface */
-		csp_route_t * route = csp_rtable_find_route(packet->id.dst);
-
-		/* If the message resolves to the input interface, don't loop it back out */
-		if ((route == NULL) || ((route->iface == input.iface) && (input.iface->split_horizon_off == 0))) {
-			csp_buffer_free(packet);
-			return CSP_ERR_NONE;
-		}
-
 		/* Otherwise, actually send the message */
-		if (csp_send_direct(packet->id, packet, 0) != CSP_ERR_NONE) {
-			csp_buffer_free(packet);
-		}
-
-		/* Next message, please */
+		csp_send_direct(&packet->id, packet, input.iface);
 		return CSP_ERR_NONE;
+
 	}
 
 	/* Discard packets with unsupported options */
@@ -187,7 +176,7 @@ int csp_route_work(void) {
 	csp_callback_t callback = csp_port_get_callback(packet->id.dport);
 	if (callback) {
 
-		if (csp_route_security_check(CSP_SO_NONE, input.iface, packet) < 0) {
+		if (csp_route_security_check(CSP_SO_CRC32REQ, input.iface, packet) != CSP_ERR_NONE) {
 			csp_buffer_free(packet);
 			return CSP_ERR_NONE;
 		}
@@ -206,7 +195,7 @@ int csp_route_work(void) {
 	/* If the socket is connection-less, deliver now */
 	if (socket && (socket->opts & CSP_SO_CONN_LESS)) {
 
-		if (csp_route_security_check(socket->opts, input.iface, packet) < 0) {
+		if (csp_route_security_check(socket->opts, input.iface, packet) != CSP_ERR_NONE) {
 			csp_buffer_free(packet);
 			return CSP_ERR_NONE;
 		}
@@ -214,7 +203,7 @@ int csp_route_work(void) {
 		if (csp_queue_enqueue(socket->rx_queue, &packet, 0) != CSP_QUEUE_OK) {
 			csp_dbg_conn_ovf++;
 			csp_buffer_free(packet);
-			return 0;
+			return CSP_ERR_NONE;
 		}
 		
 		return CSP_ERR_NONE;
@@ -233,7 +222,7 @@ int csp_route_work(void) {
 		}
 
 		/* Run security check on incoming packet */
-		if (csp_route_security_check(socket->opts, input.iface, packet) < 0) {
+		if (csp_route_security_check(socket->opts, input.iface, packet) != CSP_ERR_NONE) {
 			csp_buffer_free(packet);
 			return CSP_ERR_NONE;
 		}
@@ -248,7 +237,7 @@ int csp_route_work(void) {
 		idout.flags = packet->id.flags;
 
 		/* Create connection */
-		conn = csp_conn_new(packet->id, idout);
+		conn = csp_conn_new(packet->id, idout, CONN_SERVER);
 
 		if (!conn) {
 			csp_dbg_conn_out++;
@@ -264,7 +253,7 @@ int csp_route_work(void) {
 	} else {
 
 		/* Run security check on incoming packet */
-		if (csp_route_security_check(conn->opts, input.iface, packet) < 0) {
+		if (csp_route_security_check(conn->opts, input.iface, packet) != CSP_ERR_NONE) {
 			csp_buffer_free(packet);
 			return CSP_ERR_NONE;
 		}
@@ -282,7 +271,7 @@ int csp_route_work(void) {
 #endif
 
 	/* Otherwise, enqueue directly */
-	if (csp_conn_enqueue_packet(conn, packet) < 0) {
+	if (csp_conn_enqueue_packet(conn, packet) != CSP_ERR_NONE) {
 		csp_dbg_conn_ovf++;
 		csp_buffer_free(packet);
 		return CSP_ERR_NONE;

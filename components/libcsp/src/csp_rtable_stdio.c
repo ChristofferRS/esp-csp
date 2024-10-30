@@ -6,7 +6,7 @@
 #include <csp/csp_id.h>
 #include <csp/csp_iflist.h>
 #include <csp/interfaces/csp_if_lo.h>
-#include <csp/csp_autoconfig.h>
+#include "csp/autoconfig.h"
 
 static int csp_rtable_parse(const char * rtable, int dry_run) {
 
@@ -41,7 +41,7 @@ static int csp_rtable_parse(const char * rtable, int dry_run) {
 
 		csp_iface_t * ifc = csp_iflist_get_by_name(name);
 		if ((address > csp_id_get_max_nodeid()) || (netmask > (int)csp_id_get_host_bits()) || (ifc == NULL)) {
-			csp_dbg_errno = CSP_DBG_ERR_INVALID_RTABLE_ENTRY;
+			csp_dbg_errno = CSP_DBG_ERR_INVALID_RTABLE_ENTRY; 
 			return CSP_ERR_INVAL;
 		}
 

@@ -12,16 +12,33 @@ static csp_route_t rtable[CSP_RTABLE_SIZE] = {0};
 
 static int rtable_inptr = 0;
 
-static csp_route_t * csp_rtable_find_exact(uint16_t addr, uint16_t netmask) {
+static csp_route_t * csp_rtable_find_exact(uint16_t addr, uint16_t netmask, csp_iface_t * ifc) {
 
 	/* Start search */
 	for (int i = 0; i < rtable_inptr; i++) {
-		if (rtable[i].address == addr && rtable[i].netmask == netmask) {
+		if (rtable[i].address == addr && rtable[i].netmask == netmask && rtable[i].iface == ifc) {
 			return &rtable[i];
 		}
 	}
 
 	return NULL;
+}
+
+csp_route_t * csp_rtable_search_backward(csp_route_t * start_route) {
+
+    if (start_route == NULL || start_route <= rtable) {
+        return NULL;
+    }
+
+    /* Start searching backward from the route before start_route */
+    for (csp_route_t * route = start_route - 1; route >= rtable; route--) {
+
+        if (route->netmask == start_route->netmask && route->address == start_route->address) {
+            return route;
+        }
+    }
+
+    return NULL;
 }
 
 csp_route_t * csp_rtable_find_route(uint16_t addr) {
@@ -59,13 +76,14 @@ csp_route_t * csp_rtable_find_route(uint16_t addr) {
 int csp_rtable_set_internal(uint16_t address, uint16_t netmask, csp_iface_t * ifc, uint16_t via) {
 
 	/* First see if the entry exists */
-	csp_route_t * entry = csp_rtable_find_exact(address, netmask);
+	csp_route_t * entry = csp_rtable_find_exact(address, netmask, ifc);
 
 	/* If not, create a new one */
 	if (!entry) {
 		entry = &rtable[rtable_inptr++];
-		if (rtable_inptr == CSP_RTABLE_SIZE)
+		if (rtable_inptr > CSP_RTABLE_SIZE) {
 			rtable_inptr = CSP_RTABLE_SIZE;
+		}
 	}
 
 	/* Fill in the data */
@@ -92,8 +110,8 @@ int csp_rtable_set(uint16_t address, int netmask, csp_iface_t * ifc, uint16_t vi
 	}
 
 	/* Validates options */
-	if ((ifc == NULL) || (netmask > (int)csp_id_get_host_bits())) {
-		csp_dbg_errno = CSP_DBG_ERR_INVALID_RTABLE_ENTRY; 
+	if (ifc == NULL) {
+		csp_dbg_errno = CSP_DBG_ERR_INVALID_RTABLE_ENTRY;
 		return CSP_ERR_INVAL;
 	}
 

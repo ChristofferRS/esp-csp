@@ -1,15 +1,6 @@
-
-
 #include <csp/csp.h>
 
 #include <csp/csp_debug.h>
-#ifdef __GNUC__
-#ifndef alloca
-#define alloca __builtin_alloca
-#endif
-#else
-#include <alloca.h>
-#endif
 #include <string.h>
 
 #include <csp/csp_cmp.h>
@@ -19,8 +10,6 @@
 #include <csp/csp_rtable.h>
 #include <csp/csp_id.h>
 #include <csp/arch/csp_time.h>
-
-#define CSP_RPS_MTU 196
 
 /**
  * The CSP CMP mempy function is used to, override the function used to
@@ -33,10 +22,20 @@ static uint32_t wrap_32bit_memcpy(uint32_t to, const uint32_t from, size_t size)
 static csp_memcpy_fnc_t csp_cmp_memcpy_fnc = wrap_32bit_memcpy;
 #else
 static csp_memcpy_fnc_t csp_cmp_memcpy_fnc = (csp_memcpy_fnc_t)memcpy;
+static csp_memread64_fnc_t csp_cmp_memread64_fnc = (csp_memread64_fnc_t)NULL;
+static csp_memwrite64_fnc_t csp_cmp_memwrite64_fnc = (csp_memwrite64_fnc_t)NULL;
 #endif
 
 void csp_cmp_set_memcpy(csp_memcpy_fnc_t fnc) {
 	csp_cmp_memcpy_fnc = fnc;
+}
+
+void csp_cmp_set_memread64(csp_memread64_fnc_t fnc) {
+	csp_cmp_memread64_fnc = fnc;
+}
+
+void csp_cmp_set_memwrite64(csp_memwrite64_fnc_t fnc) {
+	csp_cmp_memwrite64_fnc = fnc;
 }
 
 static int do_cmp_ident(struct csp_cmp_message * cmp) {
@@ -45,6 +44,7 @@ static int do_cmp_ident(struct csp_cmp_message * cmp) {
 	strncpy(cmp->ident.revision, csp_conf.revision, CSP_CMP_IDENT_REV_LEN);
 	cmp->ident.revision[CSP_CMP_IDENT_REV_LEN - 1] = '\0';
 
+#if CSP_REPRODUCIBLE_BUILDS == 0
 	/* Copy compilation date */
 	strncpy(cmp->ident.date, __DATE__, CSP_CMP_IDENT_DATE_LEN);
 	cmp->ident.date[CSP_CMP_IDENT_DATE_LEN - 1] = '\0';
@@ -52,6 +52,7 @@ static int do_cmp_ident(struct csp_cmp_message * cmp) {
 	/* Copy compilation time */
 	strncpy(cmp->ident.time, __TIME__, CSP_CMP_IDENT_TIME_LEN);
 	cmp->ident.time[CSP_CMP_IDENT_TIME_LEN - 1] = '\0';
+#endif
 
 	/* Copy hostname */
 	strncpy(cmp->ident.hostname, csp_conf.hostname, CSP_HOSTNAME_LEN);
@@ -70,10 +71,11 @@ static int do_cmp_route_set_v1(struct csp_cmp_message * cmp) {
 	if (ifc == NULL) {
 		return CSP_ERR_INVAL;
 	}
-
+#if CSP_USE_RTABLE
 	if (csp_rtable_set(cmp->route_set_v1.dest_node, csp_id_get_host_bits(), ifc, cmp->route_set_v1.next_hop_via) != CSP_ERR_NONE) {
 		return CSP_ERR_INVAL;
 	}
+#endif
 
 	return CSP_ERR_NONE;
 }
@@ -85,9 +87,11 @@ static int do_cmp_route_set_v2(struct csp_cmp_message * cmp) {
 		return CSP_ERR_INVAL;
 	}
 
+#if CSP_USE_RTABLE
 	if (csp_rtable_set(be16toh(cmp->route_set_v2.dest_node), be16toh(cmp->route_set_v2.netmask), ifc, be16toh(cmp->route_set_v2.next_hop_via)) != CSP_ERR_NONE) {
 		return CSP_ERR_INVAL;
 	}
+#endif
 
 	return CSP_ERR_NONE;
 }
@@ -132,6 +136,38 @@ static int do_cmp_poke(struct csp_cmp_message * cmp) {
 
 	/* Extremely dangerous, you better know what you are doing */
 	csp_cmp_memcpy_fnc((csp_memptr_t)(uintptr_t)cmp->poke.addr, (csp_memptr_t)(uintptr_t)cmp->poke.data, cmp->poke.len);
+
+	return CSP_ERR_NONE;
+}
+
+static int do_cmp_peek_v2(struct csp_cmp_message * cmp) {
+
+	cmp->peek_v2.vaddr = htobe64(cmp->peek_v2.vaddr);
+	if (cmp->peek_v2.len > CSP_CMP_PEEK_V2_MAX_LEN)
+		return CSP_ERR_INVAL;
+
+	if (!csp_cmp_memread64_fnc) {
+		return CSP_ERR_DRIVER;
+	}
+
+	/* Dangerous, you better know what you are doing */
+	csp_cmp_memread64_fnc(cmp->peek_v2.data, cmp->peek_v2.vaddr, cmp->peek_v2.len);
+
+	return CSP_ERR_NONE;
+}
+
+static int do_cmp_poke_v2(struct csp_cmp_message * cmp) {
+
+	cmp->poke_v2.vaddr = htobe64(cmp->poke_v2.vaddr);
+	if (cmp->poke_v2.len > CSP_CMP_POKE_V2_MAX_LEN)
+		return CSP_ERR_INVAL;
+
+	if (!csp_cmp_memwrite64_fnc) {
+		return CSP_ERR_DRIVER;
+	}
+
+	/* Extremely dangerous, you better know what you are doing */
+	csp_cmp_memwrite64_fnc(cmp->poke_v2.vaddr, cmp->poke_v2.data, cmp->poke_v2.len);
 
 	return CSP_ERR_NONE;
 }
@@ -198,6 +234,14 @@ static int csp_cmp_handler(csp_packet_t * packet) {
 			ret = do_cmp_poke(cmp);
 			break;
 
+		case CSP_CMP_PEEK_V2:
+			ret = do_cmp_peek_v2(cmp);
+			break;
+
+		case CSP_CMP_POKE_V2:
+			ret = do_cmp_poke_v2(cmp);
+			break;
+
 		case CSP_CMP_CLOCK:
 			ret = do_cmp_clock(cmp);
 			break;
@@ -213,7 +257,7 @@ static int csp_cmp_handler(csp_packet_t * packet) {
 }
 
 void csp_service_handler(csp_packet_t * packet) {
-	//csp_hex_dump("incoming packet", packet->data, packet->length);
+
 	switch (packet->id.dport) {
 
 		case CSP_CMP:
@@ -240,7 +284,7 @@ void csp_service_handler(csp_packet_t * packet) {
 
 			uint32_t total = 0;
 			total = csp_memfree_hook();
-
+			
 			total = htobe32(total);
 			memcpy(packet->data, &total, sizeof(total));
 			packet->length = sizeof(total);
