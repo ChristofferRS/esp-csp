@@ -206,7 +206,6 @@ static void param_serve_push(csp_packet_t * packet, int send_ack, int version, i
 
 
 void param_serve(csp_packet_t * packet) {
-    csp_print("HANDLE PARAM REQ!!!");
 	switch(packet->data[0]) {
 		case PARAM_PULL_REQUEST:
 			param_serve_pull_request(packet, 0, 1);
