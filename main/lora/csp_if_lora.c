@@ -28,8 +28,8 @@ int lora_tx(csp_iface_t *iface, uint16_t via, csp_packet_t *packet, int from_me)
     //Lock -> Transmit -> unlock
     while(xSemaphoreTake(driver->lock, 10) == pdFALSE);
     lora_send_packet(packet->frame_begin, packet->frame_length);
-    lora_receive(); // put into receive mode
     xSemaphoreGive(driver->lock);
+    csp_buffer_free(packet);
 
     return CSP_ERR_NONE;
 }
@@ -63,7 +63,7 @@ void lora_rx_task(void* param){
     struct lora_driver_s *drv = param;
     while(1){
         if(xSemaphoreTake(drv->lock, 10) == pdTRUE){
-            //ESP_LOGI(pcTaskGetName(NULL), "WORKING RX!!");
+            lora_receive();
             work_lora_rx(drv);
             xSemaphoreGive(drv->lock);
         }
