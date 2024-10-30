@@ -579,7 +579,7 @@ lora_init(void)
    lora_sleep();
    lora_write_reg(REG_FIFO_RX_BASE_ADDR, 0);
    lora_write_reg(REG_FIFO_TX_BASE_ADDR, 0);
-   lora_write_reg(REG_LNA, lora_read_reg(REG_LNA) | 0x03);
+   lora_write_reg(REG_LNA, lora_read_reg(REG_LNA) | 0x00); //00 -> Default LNA Curret 0x03 -> boost lna current 150%
    lora_write_reg(REG_MODEM_CONFIG_3, 0x04);
    lora_set_tx_power(17);
 
