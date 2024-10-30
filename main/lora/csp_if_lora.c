@@ -22,7 +22,6 @@ static struct lora_driver_s{
 
 
 int lora_tx(csp_iface_t *iface, uint16_t via, csp_packet_t *packet, int from_me){
-    ESP_LOGI(pcTaskGetName(NULL), "Called lora tx");
     struct lora_driver_s *driver = iface->driver_data;
 	csp_id_prepend(packet);
     //Lock -> Transmit -> unlock

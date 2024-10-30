@@ -614,10 +614,9 @@ lora_send_packet(uint8_t *buf, int size)
     * Start transmission and wait for conclusion.
     */
    lora_write_reg(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_TX);
-#if 0
-   while((lora_read_reg(REG_IRQ_FLAGS) & IRQ_TX_DONE_MASK) == 0)
+   while((lora_read_reg(REG_IRQ_FLAGS) & IRQ_TX_DONE_MASK) == 0){
       vTaskDelay(2);
-#endif
+    }
    int loop = 0;
    while(1) {
       int irq = lora_read_reg(REG_IRQ_FLAGS);
