@@ -15,7 +15,7 @@ void vmem_flash_write(vmem_t * vmem, uint64_t addr, const void * datain, uint32_
 
 //TODO: .ack_with_pull = 1 needed on macro=
 #define VMEM_DEFINE_FLASH(name_in, strname, size_in, _vaddr) \
-	uint8_t vmem_##name_in##_buf[FLASH_BUFFER_SIZE] = {}; \
+	uint8_t vmem_##name_in##_buf[size_in] = {}; \
 	static vmem_flash_driver_t vmem_##name_in##_driver = { \
 		.physaddr = vmem_##name_in##_buf, \
 	}; \
