@@ -16,3 +16,10 @@ The setup consists of two Lilligo LoRa boards. One of the boards can serve as a
 UDP bridge, allowing communication with the other LoRa board through UDP ->
 LoRa.
 
+
+In addition this project also implements vmem storage in the esp32 flash. This
+is done in the `vmem_flash.c` file. It utilizes the additional libparam flash
+partition sepcified in the partitioning table `partitions.csv`. This allows
+storage of configuration paramters between reboots and in the future could
+allow implementation of the multiple flash slots used on satellites. This would
+requiere implementing hooks on the existing esp32 bootloader.
